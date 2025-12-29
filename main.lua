@@ -1,3 +1,9 @@
+local suspiciouskeywords = { --what keywords should the bot detector look for? ALL LOWERCASE OR IT WON'T WORK
+    "bloxdro",
+}
+
+
+
 _G.KorsHubRunning = true
 --to make sure you can move your cursor when menu is open
 local modalgui = Instance.new("ScreenGui", game:GetService("CoreGui"))
@@ -11,23 +17,34 @@ do --to localize the modalbutton only to this since the variable isnt important 
     modalbutton.Size = UDim2.fromOffset(0, 0)
 end
 
+local AssetService = game:GetService("AssetService")
 local Stats = game:GetService("Stats")
 local FrameRateManager = Stats and Stats:FindFirstChild("FrameRateManager")
 local RenderAverage = FrameRateManager and FrameRateManager:FindFirstChild("RenderAverage")
-
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local function GetFramerate(): number
 	return 1000 / RenderAverage:GetValue()
 end
 
+--credits to infinite yield for this
+local function chatMessage(str)
+    str = tostring(str)
+    if TextChatService.ChatVersion ~= Enum.ChatVersion.LegacyChatService then
+        TextChatService.TextChannels.RBXGeneral:SendAsync(str)
+    else
+        ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(str, "All")
+    end
+end
 
-local SCRIPTVERSION = "1.0"
+
+local SCRIPTVERSION = "1.1"
 local LATESTVERSION = loadstring(game:HttpGet("https://raw.githubusercontent.com/korbloxin/korshub/refs/heads/main/latestversion.lua"))()
 
 local RenderSteppedLoop = nil
 local InputLoop = nil
 local DescAddedLoop = nil   
-local LastSpawnTime = nil
 local EndAllLoops = false
 
 
@@ -45,7 +62,6 @@ local function anonymousmodeerror(actionname:string)
     }
 })
 end
-
 local function errornotif(error:string)
     WindUI:Notify({
         Title = "Kor's Hub Script Error",
@@ -63,12 +79,60 @@ local function keybindnotif(keybind:string)
     })
 end
 
+WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+local LastBotWarnChat = 0
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
-local LastSpawn = nil
+local LastSpawn = 0
 local LastSpawnChecker = LocalPlayer.CharacterAdded:Connect(function()
     LastSpawn = os.clock()
 end)
+local notifyuserofbot = {}
+function notifyuserofbot.keyword(userid: number, keyword: string)
+    if not userid then return end
+
+    keyword = tostring(keyword)
+
+    local player = Players:GetPlayerByUserId(userid)
+
+    if player then
+        WindUI:Notify({
+            Title = `Bot Detected: {player.DisplayName} (@{player.Name})`,
+            Content = `Suspicious keyword "{keyword}" was found in their chat message`,
+            Duration = 10,
+            Icon = "bot",
+        })
+    else
+        WindUI:Notify({
+            Title = `Bot Detected (User left server with a UserID of {userid})`,
+            Content = `Suspicious keyword "{keyword}" was found in their chat message`,
+            Duration = 10,
+            Icon = "bot-off",
+        })
+    end
+end
+function notifyuserofbot.leavetime(userid: number, timeleftlessthan: number)
+
+local player = Players:GetPlayerByUserId(userid)
+if player then
+WindUI:Notify({
+    Title = `Possible Bot Activity Detected for {player.DisplayName} (@{player.Name})`,
+    Content = `User left in less than {tostring(math.round(timeleftlessthan))} seconds`, --intended like "user left in less than 30 seconds" or "user left in less than 10 seconds"
+    Duration = 10,
+    Icon = "bot",
+})
+else
+WindUI:Notify({
+    Title = "Possible Bot Activity Detected (Could not fetch player data in time)",
+    Content = `User left in less than {tostring(math.round(timeleftlessthan))} seconds`, --intended like "user left in less than 30 seconds" or "user left in less than 10 seconds"
+    Duration = 10,
+    Icon = "bot-off",
+})
+end 
+end
+
 
 local function gettimesincespawn()
     if LastSpawn ~= nil then
@@ -78,7 +142,7 @@ local function gettimesincespawn()
     end
 end
 
-WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
 WindUI:SetFont("rbxassetid://12187365364")
 local Window = true
 Window = WindUI:CreateWindow({
@@ -89,7 +153,7 @@ Window = WindUI:CreateWindow({
     NewElements = true,
     Size = UDim2.fromOffset(700,2000),
     
-    HideSearchBar = false,
+    HideSearchBar = false, 
     
     OpenButton = {
         Title = "Kor's Hub", -- can be changed
@@ -250,8 +314,6 @@ local ConfigTab = Window:Tab({
     Icon = "settings-2",
     Locked = false,
 })
-
-ConfigTab:Select()
 
 ConfigTab:Keybind({
     Title = "Quick Hide Keybind",
@@ -500,6 +562,41 @@ HubsTab:Dropdown({
     }
 })
 
+Window:Divider()
+
+local BetaTestTab = Window:Tab({
+    Title = "Beta Features",
+    Icon = "bug-play",
+    Locked = false,
+})
+
+BetaTestTab:Button({
+    Title = "Run the beta version of this script",
+    Desc = "Recommended to use the stable version of this script",
+    Icon = "bug-play",
+    Locked = false,
+    Callback = function()
+        if Anonymous.Value then
+        anonymousmodeerror("HttpGet")
+        else
+        
+        end
+    end
+})
+
+BetaTestTab:Divider()
+
+if true then --allows toggling this message
+BetaTestTab:Section({ 
+    Title = "No beta features here right now...",
+    Icon = "text-select",
+    TextTransparency = 0.5,
+    TextSize = 13,
+})
+end
+
+
+
 
 
 local NotifTestTab = Window:Tab({
@@ -593,223 +690,33 @@ end
     end
 })
 
-Window:Divider()
-
-local MechanicsTab = Window:Tab({
-    Title = "Gameplay Mechanics",
-    Icon = "dices",
+local PlacesTab = Window:Tab({
+    Title = "All Universe Places",
+    Icon = "earth",
     Locked = false,
 })
 
-local ShiftlockSection = MechanicsTab:Section({
-    Title = "Shiftlock",
-    Icon = "locate",
-    Opened = false,
+local gameplaces = AssetService:GetGamePlacesAsync():GetCurrentPage()
+for i, v in ipairs(gameplaces) do
+if v.PlaceId == game.PlaceId then
+PlacesTab:Button({
+    Title = v.Name,
+    Desc = `ID: {v.PlaceId}\nYou're already in this place`,
+    Locked = false,
+    Icon = "arrow-down-to-dot",
 })
-
-local ShiftlockLoopDropdown = ShiftlockSection:Dropdown({
-    Title = "Loop Mode",
-    Desc = "What to constantly set the value to",
-    Values = {
-        {
-            Title = "On",
-            Icon = "toggle-right"
-        },
-        {
-            Title = "Off",
-            Icon = "toggle-left"
-        },
-        {Type = "Divider"},
-        {
-            Title = "Don't Loop",
-            Icon = "power-off"
-        },
-    },
-    Value = "Don't Loop",
-    Callback = function() end
+else
+PlacesTab:Button({
+    Title = v.Name,
+    Desc = `ID: {v.PlaceId}\nClick to teleport to this place`,
+    Locked = false,
+    Icon = "land-plot",
+    Callback = function()
+    TeleportService:Teleport(v.PlaceId)
+    end
 })
-ShiftlockSection:Dropdown({
-    Title = "Set to",
-    Desc = "Set to once",
-    Values = {
-        {
-            Title = "On",
-            Icon = "toggle-right",
-            Callback = function()
-                LocalPlayer.DevEnableMouseLock = true
-            end
-        },
-        {
-            Title = "Off",
-            Icon = "toggle-left",
-            Callback = function()
-                LocalPlayer.DevEnableMouseLock = false
-            end
-        },
-    },
-})
-
-ShiftlockSection:Divider()
-
-local CamSection = MechanicsTab:Section({
-    Title = "Camera",
-    Icon = "camera",
-    Opened = false,
-})
-
-local CamModeSection = CamSection:Section({
-    Title = "Camera Mode",
-    Icon = "aperture",
-    Opened = false,
-})
-
-local CamModeLoopDropdown = CamModeSection:Dropdown({
-    Title = "Loop Mode",
-    Desc = "What to constantly set the value to",
-    Values = {
-        {
-            Title = "Zoom",
-            Desc = "The default camera mode",
-            Icon = "webcam"
-        },
-        {
-            Title = "Inviscam",
-            Desc = "Allows you to see through walls",
-            Icon = "scan-eye"
-        },
-        {Type = "Divider"},
-        {
-            Title = "Don't Loop",
-            Icon = "power-off"
-        },
-    },
-    Value = "Don't Loop",
-    Callback = function() end
-})
-CamModeSection:Dropdown({
-    Title = "Set to",
-    Desc = "Set to once",
-    Values = {
-        {
-            Title = "Zoom",
-            Desc = "The default camera mode",
-            Icon = "webcam",
-            Callback = function()
-                LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Zoom
-            end
-        },
-        {
-            Title = "Inviscam",
-            Desc = "Allows you to see through walls",
-            Icon = "scan-eye",
-            Callback = function()
-                LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
-            end
-        },
-    },
-})
-
-CamModeSection:Divider()
-
-local CamTypeSection = CamSection:Section({
-    Title = "Camera Type",
-    Icon = "focus",
-    Opened = false,
-})
-
-local CamTypeLoopDropdown = CamTypeSection:Dropdown({
-    Title = "Loop Mode",
-    Desc = "What to constantly set the value to",
-    Values = {
-        {
-        Title = "Camera Toggle",
-        Desc = "Shift to offset camera (doesn't turn your body like Shiftlock), right click to toggle cursorlock (Fallbacks to Classic on mobile)",
-        Icon = "plus"
-        },
-        {
-        Title = "Classic",
-        Desc = "The default camera mode for computer",
-        Icon = "camera"
-        },
-        {
-            Title = "Follow",
-            Desc = "The default camera mode for mobile (your camera follows your walking direction)",
-            Icon = "refresh-ccw-dot"
-        },
-        {
-            Title = "Orbital",
-            Desc = "Locks zoom and camera to a top-down perspective",
-            Icon = "move-up-left"
-        },
-        {
-            Title = "User Choice",
-            Desc = "Allow switching by user in Roblox settings",
-            Icon = "settings"
-        },
-        {Type = "Divider"},
-        {
-        Title = "Don't Loop",
-        Icon = "power-off"
-        },
-    },
-    Value = "Don't Loop",
-    Callback = function() end
-})
-CamTypeSection:Dropdown({
-    Title = "Set to",
-    Desc = "Set to once",
-    Values = {
-        {
-        Title = "Camera Toggle",
-        Desc = "Shift to offset camera (doesn't turn your body like Shiftlock), right click to toggle cursorlock (Fallbacks to User Choice on mobile)",
-        Icon = "plus",
-        Callback = function()
-            LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.CameraToggle
-            LocalPlayer.DevTouchCameraMode = Enum.DevTouchCameraMovementMode.UserChoice
-        end
-        },
-        {
-        Title = "Classic",
-        Desc = "The default camera mode for computer",
-        Icon = "camera",
-        Callback = function()
-            LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.Classic
-            LocalPlayer.DevTouchCameraMode = Enum.DevTouchCameraMovementMode.Classic
-        end
-        },
-        {
-            Title = "Follow",
-            Desc = "The default camera mode for mobile (your camera follows your walking direction)",
-            Icon = "refresh-ccw-dot",
-            Callback = function()
-                LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.Follow
-                LocalPlayer.DevTouchCameraMode = Enum.DevTouchCameraMovementMode.Follow
-            end
-        },
-        {
-            Title = "Orbital",
-            Desc = "Locks zoom and camera to a top-down perspective",
-            Icon = "move-up-left",
-            Callback = function()
-                LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.Orbital
-                LocalPlayer.DevTouchCameraMode = Enum.DevTouchCameraMovementMode.Orbital
-            end
-        },
-        {
-            Title = "User Choice",
-            Desc = "Allow switching by user in Roblox settings",
-            Icon = "settings",
-            Callback = function()
-                LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.UserChoice
-                LocalPlayer.DevTouchCameraMode = Enum.DevTouchCameraMovementMode.UserChoice
-            end
-        },
-    },
-})
-
-CamTypeSection:Divider()
-
-CamSection:Divider()
+end
+end
 
 Window:Divider()
 
@@ -836,14 +743,10 @@ if compatiblegame then
     Icon = "smile-plus",
     Locked = false,
 })
-local compatiblebutton = nil
-compatiblebutton = tab:Button({
+tab:Button({
     Title = `This game has designated features for {compatiblegame.GameName} ({compatiblegame.GameId})`,
     Desc = "Use the search bar to find the tab for it",
     Locked = false,
-    Callback = function()
-        compatiblebutton:Highlight()
-    end
 })
 tab:Divider()
 else
@@ -851,7 +754,13 @@ else
     Title = "Game Not Compatible",
     Icon = "frown",
     Locked = false,
-})
+    })
+    tab:Button({
+    Title = "This game doesn't have designated features",
+    Desc = "You can still use the other features on the left of the screen",
+    Locked = false,
+    })
+    tab:Divider()
 end
 local compatiblegamessection = tab:Section({ 
     Title = "Compatible Games",
@@ -872,29 +781,12 @@ compatiblegamessection:Button({
     Desc = "Click to teleport",
     Locked = false,
     Callback = function()
-    WindUI:Popup({
-    Title = "Are you sure you want to teleport?",
-    Icon = "info",
-    Content = "This will leave you from the current game and lose all unsaved progress.",
-    Buttons = {
-        {
-            Title = "Cancel",
-            Icon = "x",
-            Variant = "Secondary",
-        },
-        {
-            Title = "Continue",
-            Icon = "arrow-right",
-            Callback = function()
-            game:GetService("TeleportService"):Teleport(v.GameId) end,
-            Variant = "Primary",
-        }
-    }
-})
+    TeleportService:Teleport(v.GameId)
     end
 })
 end
 end
+tab:Select()
 end
 
 
@@ -928,6 +820,24 @@ DGCB67Disable67Alerts = DGCB67Tab:Toggle({
     Type = "Toggle",
     Value = false,
 })
+local DGCB67DisableKnockback = DGCB67Tab:Toggle({
+    Title = "Disable Player Knockback",
+    Icon = "wind-arrow-down",
+    Desc = "Does not prevent if a player pays to fling you, however it does basically nothing so you would be good",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(state) 
+        if LocalPlayer.Character == nil then
+            errornotif("Character doesn't exist")
+            return
+        end
+        if not LocalPlayer.Character:FindFirstChild("fling") then
+            errornotif("fling doesn't exist")
+            return
+        end
+        LocalPlayer.Character:WaitForChild("fling").Enabled = not state
+    end
+})
 DGCB67Tab:Toggle({
     Title = "Mute Music",
     Icon = "volume-x",
@@ -956,6 +866,74 @@ DGCB67Tab:Toggle({
     end
 })
 
+DGCB67Tab:Space()
+
+DGCB67Tab:Dropdown({
+    Title = "Teleport To",
+    Icon = "map",
+    Values = {
+        {
+            Title = "Starter",
+            Desc = "0 rebirths",
+            Callback = function()
+                if LocalPlayer.Character == nil then
+                    errornotif("Character doesn't exist")
+                    return
+                end
+                if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    errornotif("HumanoidRootPart doesn't exist")
+                    return
+                end
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(-68, 5, 308))
+            end
+        },
+        {
+            Title = "Fire",
+            Desc = "2 rebirths",
+            Callback = function()
+                if LocalPlayer.Character == nil then
+                    errornotif("Character doesn't exist")
+                    return
+                end
+                if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    errornotif("HumanoidRootPart doesn't exist")
+                    return
+                end
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(60, 5, -995))
+            end
+        },
+        {
+            Title = "Toxic",
+            Desc = "5 rebirths",
+            Callback = function()
+                if LocalPlayer.Character == nil then
+                    errornotif("Character doesn't exist")
+                    return
+                end
+                if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    errornotif("HumanoidRootPart doesn't exist")
+                    return
+                end
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(60, 5, -2506))
+            end
+        },
+        {
+            Title = "Bloodmoon",
+            Desc = "8 rebirths",
+            Callback = function()
+                if LocalPlayer.Character == nil then
+                    errornotif("Character doesn't exist")
+                    return
+                end
+                if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    errornotif("HumanoidRootPart doesn't exist")
+                    return
+                end
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(60, 5, -4381))
+            end
+        },
+    },
+})
 
 
 RenderSteppedLoop = game:GetService("RunService").RenderStepped:Connect(function(deltaTime:number)
@@ -1001,6 +979,18 @@ end)
 if game.GameId == 8620685718 then
 while task.wait(4) do
 if EndAllLoops then return end
+task.spawn(function()
+if LocalPlayer.Character == nil then
+        errornotif("Character doesn't exist")
+        return
+    end
+    if not LocalPlayer.Character:FindFirstChild("fling") then
+        errornotif("fling doesn't exist")
+        return
+    end
+    LocalPlayer.Character:WaitForChild("fling").Enabled = not DGCB67DisableKnockback.Value
+end)
+
 if DGCB67AutoFarm.Value then
     if LocalPlayer.Character == nil then
         errornotif("Character doesn't exist")
