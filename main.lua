@@ -1,5 +1,7 @@
 local suspiciouskeywords = { --what keywords should the bot detector look for? ALL LOWERCASE OR IT WON'T WORK
+    --Category: Scam Bots
     "bloxdro",
+    "bloxsdro",
 }
 
 
@@ -39,7 +41,7 @@ local function chatMessage(str)
 end
 
 
-local SCRIPTVERSION = "1.1"
+local SCRIPTVERSION = "1.15"
 local LATESTVERSION = loadstring(game:HttpGet("https://raw.githubusercontent.com/korbloxin/korshub/refs/heads/main/latestversion.lua"))()
 
 local RenderSteppedLoop = nil
@@ -697,6 +699,7 @@ local PlacesTab = Window:Tab({
 })
 
 local gameplaces = AssetService:GetGamePlacesAsync():GetCurrentPage()
+if #gameplaces > 1 then
 for i, v in ipairs(gameplaces) do
 if v.PlaceId == game.PlaceId then
 PlacesTab:Button({
@@ -717,11 +720,24 @@ PlacesTab:Button({
 })
 end
 end
+else
+PlacesTab:Section({ 
+    Title = "This game doesn't have any additional places in its universe",
+    Icon = "map-minus",
+    TextTransparency = 0.5,
+    TextSize = 13,
+})
+end
+
+
+
+
 
 Window:Divider()
 
 local compatiblegames = {
-    {GameId = 8620685718, GameName = "Don't Get Crushed by 67", Icon = "hand-coins" --[[lucide icon]]},
+    {GameId = 8620685718, GameName = "Don't Get Crushed by 67", Icon = "hand-coins"},
+    {GameId = 8722889197, GameName = "Don't Steal The Brainrots", Icon = "database"},
 }
 
 local GamesSection = Window:Section({ 
@@ -745,6 +761,7 @@ if compatiblegame then
 })
 tab:Button({
     Title = `This game has designated features for {compatiblegame.GameName} ({compatiblegame.GameId})`,
+    Icon = "smile-plus",
     Desc = "Use the search bar to find the tab for it",
     Locked = false,
 })
@@ -757,6 +774,7 @@ else
     })
     tab:Button({
     Title = "This game doesn't have designated features",
+    Icon = "frown",
     Desc = "You can still use the other features on the left of the screen",
     Locked = false,
     })
@@ -779,6 +797,7 @@ else
 compatiblegamessection:Button({
     Title = `{v.GameName} ({v.GameId})`,
     Desc = "Click to teleport",
+    Icon = v.Icon,
     Locked = false,
     Callback = function()
     TeleportService:Teleport(v.GameId)
@@ -936,6 +955,63 @@ DGCB67Tab:Dropdown({
 })
 
 
+local DTSBTab = GamesSection:Tab({
+    Title = "Don't Steal The Brainrots",
+    Icon = "database",
+    Locked = (game.GameId ~= 8722889197),
+})
+
+
+local autostealslider = nil
+local autostealtoggle = DTSBTab:Toggle({
+    Title = "Auto Steal",
+    Desc = "Whether or not to automatically bring the brainrot back to the base if you're holding one",
+    Icon = "fast-forward",
+    Type = "Toggle",
+    Value = false,
+    Callback = function(state) 
+        if state then
+            autostealslider:Unlock()
+        else
+            autostealslider:Lock()
+        end 
+    end
+})
+autostealslider = DTSBTab:Slider({
+    Title = "Auto Steal Delay",
+    Desc = "How long to wait until the next teleport to avoid triggering the anticheat",
+    Icon = "gauge",
+    Locked = true,
+    Step = 0.1,
+    Value = {
+        Min = 0,
+        Max = 2,
+        Default = 0.2,
+    },
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 RenderSteppedLoop = game:GetService("RunService").RenderStepped:Connect(function(deltaTime:number)
 
 end)
@@ -974,11 +1050,11 @@ end
 end)
 
 
-
+task.spawn(function()
 
 if game.GameId == 8620685718 then
 while task.wait(4) do
-if EndAllLoops then return end
+if EndAllLoops then break end
 task.spawn(function()
 if LocalPlayer.Character == nil then
         errornotif("Character doesn't exist")
@@ -1016,3 +1092,35 @@ end
 end 
 end
 
+end)
+
+task.spawn(function()
+
+--the only way to know if the player is stealing something is if the music is playing so we do that here
+if game.GameId == 8722889197 then
+while true do
+if EndAllLoops then break end
+task.wait(autostealslider.Value.Default)
+if not game:GetService("SoundService"):FindFirstChild("BackgroundMusic") then
+errornotif("BackgroundMusic doesn't exist")
+continue
+end
+if not game:GetService("SoundService").BackgroundMusic:FindFirstChild("StealingMusic") then
+errornotif("StealingMusic doesn't exist")
+continue
+end
+if autostealtoggle.Value and game:GetService("SoundService").BackgroundMusic.StealingMusic.Playing then
+if LocalPlayer.Character == nil then
+errornotif("Character doesn't exist")
+continue
+end
+if not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+errornotif("HumanoidRootPart doesn't exist")
+continue
+end
+LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame+Vector3.new(0, 0, 10)
+end
+end
+end
+
+end)
